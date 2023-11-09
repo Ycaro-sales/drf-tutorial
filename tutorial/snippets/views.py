@@ -1,3 +1,5 @@
+from rest_framework.decorators import action
+from rest_framework import viewsets
 from rest_framework import generics
 from snippets.models import Snippet
 from snippets.serializers import SnippetSerializer, UserSerializer
@@ -10,15 +12,6 @@ from rest_framework.reverse import reverse
 from rest_framework import renderers
 
 
-class SnippetHighlight(generics.GenericAPIView):
-    queryset = Snippet.objects.all()
-    renderer_classes = [renderers.StaticHTMLRenderer]
-
-    def get(self, request, *args, **kwargs):
-        snippet = self.get_object()
-        return Response(snippet.highlighted)
-
-
 @api_view(['GET'])
 def api_root(request):
     return Response({
@@ -26,27 +19,30 @@ def api_root(request):
         'snippets': reverse('snippet-list', request=request, format=format)})
 
 
-class SnippetList(generics.ListCreateAPIView):
-    queryset = Snippet.objects.all()
-    serializer_class = SnippetSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+class SnippetViewSet(viewsets.ModelViewSet):
+    """
+    This viewset automatically provides `list`, `create`, `retrieve`,
+    `update` and `destroy` actions.
 
-    def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
-
-
-class SnippetDetail(generics.RetrieveUpdateDestroyAPIView):
+    Additionally we also provide an extra `highlight` action.
+    """
     queryset = Snippet.objects.all()
     serializer_class = SnippetSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly,
                           IsOwnerOrReadOnly]
 
+    @action(detail=True, renderer_classes=[renderers.StaticHTMLRenderer])
+    def highlight(self, request, *args, **kwargs):
+        snippet = self.get_object()
+        return Response(snippet.highlighted)
 
-class UserList(generics.ListAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
 
-class UserDetail(generics.RetrieveAPIView):
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    This viewset automatically provides `list` and `retrieve` actions.
+    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
